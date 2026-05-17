@@ -16,7 +16,13 @@ echo Waiting for deployment to settle (2s)...
 timeout /t 2 /nobreak > nul
 
 echo [3/4] Launching Streamlit Dashboard...
-start "Microgrid Dashboard" cmd /k "python -m streamlit run dashboard/app.py"
+set PYTHON_CMD=python
+if exist ..\venv\Scripts\python.exe (
+    set PYTHON_CMD=..\venv\Scripts\python.exe
+) else if exist venv\Scripts\python.exe (
+    set PYTHON_CMD=venv\Scripts\python.exe
+)
+start "Microgrid Dashboard" cmd /k "%PYTHON_CMD% -m streamlit run dashboard/app.py"
 
 echo [4/4] Opening browser...
 timeout /t 2 /nobreak > nul
