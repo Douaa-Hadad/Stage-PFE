@@ -1,0 +1,42 @@
+{
+  "Reanimation": {
+    "address": "0x906e52C1da389de8287F0878638cb53Ef631aF12",
+    "priority": 1
+  },
+  "BlocOperatoire": {
+    "address": "0x9d00E8C27cAD35e96607E0830811C97b0df433b5",
+    "priority": 1
+  },
+  "Urgences": {
+    "address": "0x064F6C766721e844A9c7c8A61F3E061E57E6aB5a",
+    "priority": 1
+  },
+  "Neonatologie": {
+    "address": "0x9C69f94944cD672f526B806f0b70780C77Ab9ddE",
+    "priority": 1
+  },
+  "Dialyse": {
+    "address": "0x5a81165d1737097B730A21c33A03EEF62B2BaA19",
+    "priority": 2
+  },
+  "Maternite": {
+    "address": "0x15197FC640cEF459e99cc79cC6EA9EA6E6078c5b",
+    "priority": 2
+  },
+  "Laboratoire": {
+    "address": "0xAB3895d5a3d625f4aDa7b29910258cF6C03D15A9",
+    "priority": 2
+  },
+  "Pharmacie": {
+    "address": "0x7ddaA0D1535E63fdBa6F7DD4820E8b0D50AD28b9",
+    "priority": 2
+  },
+  "Radiologie": {
+    "address": "0xAaB7d97B0380Aafd0e04eC3C97A61fc92fE2C869",
+    "priority": 3
+  },
+  "General": {
+    "address": "0x4B40c39e2FC988cB20Dd972AA94F436e88656f5e",
+    "priority": 5
+  }
+}
