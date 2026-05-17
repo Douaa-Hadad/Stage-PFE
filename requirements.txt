@@ -1,5 +1,5 @@
 # ── AI & Data Science ─────────────────────────────────────────────────────────
-tensorflow>=2.13
+tensorflow>=2.16          # 2.16 is the first release with Python 3.12 support
 numpy
 pandas
 scikit-learn

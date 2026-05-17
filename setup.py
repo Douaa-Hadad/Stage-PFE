@@ -13,6 +13,14 @@ import sys
 import os
 import time
 
+# Reconfigure stdout/stderr to UTF-8 on Windows to avoid UnicodeEncodeError in legacy consoles
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass # fallback for older python versions without reconfigure
+
 # ── Colour helpers (work on Windows 10+ and Linux/Mac) ───────────────────────
 RESET  = "\033[0m"
 BOLD   = "\033[1m"

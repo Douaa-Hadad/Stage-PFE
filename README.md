@@ -127,7 +127,9 @@ pip install -r requirements.txt
 ```
 
 ### Install Node.js dependencies
+Navigate to the `hospital_microgrid` directory and install the packages:
 ```bash
+cd hospital_microgrid
 npm install
 ```
 
