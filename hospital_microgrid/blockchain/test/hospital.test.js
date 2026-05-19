@@ -12,15 +12,19 @@ describe("Hospital Microgrid System", function () {
 
     EnergyToken = await ethers.getContractFactory("EnergyToken");
     energyToken = await EnergyToken.deploy();
-    await energyToken.deployed();
+    await energyToken.waitForDeployment();
+    const energyTokenAddress = await energyToken.getAddress();
 
     PriorityGuard = await ethers.getContractFactory("PriorityGuard");
     priorityGuard = await PriorityGuard.deploy();
-    await priorityGuard.deployed();
+    await priorityGuard.waitForDeployment();
+    const priorityGuardAddress = await priorityGuard.getAddress();
 
     EnergyMarket = await ethers.getContractFactory("EnergyMarket");
-    energyMarket = await EnergyMarket.deploy(energyToken.address, priorityGuard.address);
-    await energyMarket.deployed();
+    energyMarket = await EnergyMarket.deploy(energyTokenAddress, priorityGuardAddress);
+    await energyMarket.waitForDeployment();
+    const energyMarketAddress = await energyMarket.getAddress();
+    await energyToken.setMarketContract(energyMarketAddress);
   });
 
   describe("EnergyToken", function () {
@@ -53,6 +57,16 @@ describe("Hospital Microgrid System", function () {
       await expect(
         energyToken.connect(unregistered).transfer(section2.address, 10)
       ).to.be.revertedWith("Address not registered as a section");
+    });
+
+    it("should reject internal transfer from non-market", async function () {
+      await energyToken.registerSection(section1.address, "Donor", 4);
+      await energyToken.registerSection(section2.address, "Receiver", 1);
+      await energyToken.mint(section1.address, 100);
+
+      await expect(
+        energyToken.connect(section1).internalTransfer(section1.address, section2.address, 10)
+      ).to.be.revertedWith("Only market contract can perform this action");
     });
 
     it("should reject mint from non-owner", async function () {
@@ -153,6 +167,12 @@ describe("Hospital Microgrid System", function () {
       await energyMarket.logGridEvent("BLACKOUT", 101, 5000, "ONGOING");
       const event = await energyMarket.gridEvents(101);
       expect(event.eventType).to.equal("BLACKOUT");
+    });
+
+    it("should reject grid event logging from non-owner", async function () {
+      await expect(
+        energyMarket.connect(section1).logGridEvent("BLACKOUT", 102, 3000, "ONGOING")
+      ).to.be.revertedWith("Only owner can perform this action");
     });
 
     it("should return correct trade history for a section", async function () {

@@ -103,7 +103,7 @@ contract EnergyMarket {
         uint256 _eventId, 
         uint256 _capacity, 
         string memory _status
-    ) external {
+    ) external onlyOwner {
         gridEvents[_eventId] = GridEvent({
             eventId: _eventId,
             eventType: _eventType,

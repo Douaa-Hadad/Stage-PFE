@@ -9,20 +9,28 @@ async function main() {
   // 1. Deploy EnergyToken
   const EnergyToken = await hre.ethers.getContractFactory("EnergyToken");
   const energyToken = await EnergyToken.deploy();
-  await energyToken.deployed();
-  console.log("EnergyToken deployed to:", energyToken.address);
+  await energyToken.waitForDeployment();
+  const energyTokenAddress = await energyToken.getAddress();
+  console.log("EnergyToken deployed to:", energyTokenAddress);
 
   // 2. Deploy PriorityGuard
   const PriorityGuard = await hre.ethers.getContractFactory("PriorityGuard");
   const priorityGuard = await PriorityGuard.deploy();
-  await priorityGuard.deployed();
-  console.log("PriorityGuard deployed to:", priorityGuard.address);
+  await priorityGuard.waitForDeployment();
+  const priorityGuardAddress = await priorityGuard.getAddress();
+  console.log("PriorityGuard deployed to:", priorityGuardAddress);
 
   // 3. Deploy EnergyMarket
   const EnergyMarket = await hre.ethers.getContractFactory("EnergyMarket");
-  const energyMarket = await EnergyMarket.deploy(energyToken.address, priorityGuard.address);
-  await energyMarket.deployed();
-  console.log("EnergyMarket deployed to:", energyMarket.address);
+  const energyMarket = await EnergyMarket.deploy(energyTokenAddress, priorityGuardAddress);
+  await energyMarket.waitForDeployment();
+  const energyMarketAddress = await energyMarket.getAddress();
+  console.log("EnergyMarket deployed to:", energyMarketAddress);
+
+  // Configure the token contract to allow only this market to execute internal transfers.
+  const txMarketConfig = await energyToken.setMarketContract(energyMarketAddress);
+  await txMarketConfig.wait();
+  console.log("EnergyToken market contract configured:", energyMarket.address);
 
   // Save addresses
   const deploymentsDir = path.join(__dirname, "..", "deployments");

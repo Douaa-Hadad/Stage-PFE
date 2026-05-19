@@ -10,6 +10,7 @@ contract EnergyToken {
     }
 
     address public owner;
+    address public marketContract;
     uint256 public totalMinted;
     uint256 public totalTransferred;
     
@@ -19,6 +20,7 @@ contract EnergyToken {
     event Mint(address indexed section, uint256 amount);
     event Transfer(address indexed from, address indexed to, uint256 amount);
     event SectionRegistered(address indexed section, string name, uint8 priority);
+    event MarketContractUpdated(address indexed marketContract);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner can perform this action");
@@ -27,6 +29,11 @@ contract EnergyToken {
 
     modifier onlyRegistered(address _addr) {
         require(sections[_addr].isRegistered, "Address not registered as a section");
+        _;
+    }
+
+    modifier onlyMarket() {
+        require(msg.sender == marketContract, "Only market contract can perform this action");
         _;
     }
 
@@ -65,10 +72,14 @@ contract EnergyToken {
         emit Transfer(msg.sender, _to, _amount);
     }
     
-    // Internal version for EnergyMarket
-    function internalTransfer(address _from, address _to, uint256 _amount) external {
-        // In a real scenario, this would have access control (e.g., onlyMarket)
-        // For this lightweight version, we'll keep it simple or call it from the market
+    function setMarketContract(address _marketContract) external onlyOwner {
+        require(_marketContract != address(0), "Invalid market address");
+        marketContract = _marketContract;
+        emit MarketContractUpdated(_marketContract);
+    }
+
+    // Internal version for EnergyMarket; only the registered market contract may call this.
+    function internalTransfer(address _from, address _to, uint256 _amount) external onlyMarket {
         require(sections[_from].isRegistered && sections[_to].isRegistered, "Sections must be registered");
         require(sections[_from].balance >= _amount, "Insufficient balance");
         
