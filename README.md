@@ -1,7 +1,7 @@
 # Smart Hospital Microgrid — AI + Blockchain Energy Management System
 
 > **Bachelor Final Year Project (PFE)**  
-> École / Université — Casablanca, Morocco  
+> École Supérieure de Technologie — Casablanca, Morocco  
 > Academic year 2025-2026
 
 ---
