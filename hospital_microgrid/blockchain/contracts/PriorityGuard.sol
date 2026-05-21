@@ -13,6 +13,14 @@ contract PriorityGuard {
         string actionTaken;
     }
 
+    struct GeneratorEvent {
+        uint8 generatorId;
+        string eventType;
+        uint256 timestamp;
+        uint256 fuelLevel;
+        uint256 outputKw;
+    }
+
     address public owner;
     address public oracle;
     bool public protocolActive;
@@ -21,9 +29,14 @@ contract PriorityGuard {
     uint256 public alertCount;
     uint256 public head;
 
+    GeneratorEvent[50] public generatorEvents;
+    uint256 public generatorEventCount;
+    uint256 public generatorEventHead;
+
     event AlertReceived(AlertLevel level, uint256 timestamp);
     event ProtocolActivated(uint256 timestamp, string reason);
     event ProtocolRestored(uint256 timestamp);
+    event GeneratorEventLogged(uint8 generatorId, string eventType, uint256 timestamp);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner can perform this action");
@@ -73,6 +86,44 @@ contract PriorityGuard {
         alertCount++;
 
         emit AlertReceived(_level, block.timestamp);
+    }
+
+    function logGeneratorEvent(
+        uint8 generatorId,
+        string memory eventType,
+        uint256 fuelLevel,
+        uint256 outputKw
+    ) external onlyOracle {
+        GeneratorEvent memory entry = GeneratorEvent({
+            generatorId: generatorId,
+            eventType: eventType,
+            timestamp: block.timestamp,
+            fuelLevel: fuelLevel,
+            outputKw: outputKw
+        });
+
+        generatorEvents[generatorEventHead] = entry;
+        generatorEventHead = (generatorEventHead + 1) % 50;
+        generatorEventCount++;
+
+        emit GeneratorEventLogged(generatorId, eventType, block.timestamp);
+    }
+
+    function getGeneratorStatus(uint8 generatorId) external view returns (GeneratorEvent memory) {
+        require(generatorEventCount > 0, "No generator events recorded");
+        uint256 checked = 0;
+        uint256 index = generatorEventHead;
+
+        while (checked < generatorEventCount && checked < 50) {
+            index = (index + 50 - 1) % 50;
+            GeneratorEvent memory candidate = generatorEvents[index];
+            if (candidate.generatorId == generatorId) {
+                return candidate;
+            }
+            checked++;
+        }
+
+        revert("Generator status not found");
     }
 
     function triggerProtocol() internal {

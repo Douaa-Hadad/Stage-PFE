@@ -53,7 +53,7 @@ class HospitalBridge:
             f.write(log_entry)
         print(f"Transaction logged: {action} -> {tx_hash.hex()}")
 
-    def submit_alert(self, alert_level, energy_balance, affected_section, min_battery=80):
+    def submit_alert(self, alert_level, energy_balance, affected_section, min_battery=80, generator_status=None):
         """
         Calls PriorityGuard.submitAlert()
         alert_level: "NORMAL", "WARNING", "CRITICAL"
@@ -61,7 +61,8 @@ class HospitalBridge:
         levels = {"NORMAL": 0, "WARNING": 1, "CRITICAL": 2}
         level_int = levels.get(alert_level.upper(), 0)
         
-        print(f"Submitting {alert_level} alert for {affected_section}...")
+        metadata = f"GENERATOR_STATUS={generator_status}" if generator_status else ""
+        print(f"Submitting {alert_level} alert for {affected_section} {metadata}...")
         try:
             tx_hash = self.priority_guard.functions.submitAlert(
                 level_int,
@@ -70,10 +71,27 @@ class HospitalBridge:
                 affected_section
             ).transact()
             
-            self._log_transaction(f"SUBMIT_ALERT({alert_level}, {affected_section})", tx_hash)
+            self._log_transaction(f"SUBMIT_ALERT({alert_level}, {affected_section}) {metadata}", tx_hash)
             return tx_hash
         except Exception as e:
             print(f"Error submitting alert: {e}")
+            return None
+
+    def log_generator_event(self, generator_id, event_type, fuel_level, output_kw):
+        """
+        Calls PriorityGuard.logGeneratorEvent()
+        """
+        try:
+            tx_hash = self.priority_guard.functions.logGeneratorEvent(
+                int(generator_id),
+                event_type,
+                int(fuel_level),
+                int(output_kw)
+            ).transact()
+            self._log_transaction(f"LOG_GENERATOR_EVENT({generator_id}, {event_type}, fuel={fuel_level}, output={output_kw})", tx_hash)
+            return tx_hash
+        except Exception as e:
+            print(f"Error logging generator event: {e}")
             return None
 
     def execute_trade(self, donor_name, receiver_name, amount_kwh, reason):

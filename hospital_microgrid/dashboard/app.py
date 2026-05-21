@@ -30,6 +30,18 @@ if "alert_level" not in st.session_state:
     st.session_state.alert_level = "NORMAL"
 if "theme" not in st.session_state:
     st.session_state.theme = "Dark"
+if "sim_speed" not in st.session_state:
+    st.session_state.sim_speed = "1×"
+if "sim_running" not in st.session_state:
+    st.session_state.sim_running = False
+if "sim_index" not in st.session_state:
+    st.session_state.sim_index = 0
+if "sim_scenario" not in st.session_state:
+    st.session_state.sim_scenario = "None"
+if "trade_session_kwh" not in st.session_state:
+    st.session_state.trade_session_kwh = 0.0
+if "trade_session_mad" not in st.session_state:
+    st.session_state.trade_session_mad = 0.0
 
 _is_dark = st.session_state.theme == "Dark"
 _initial_theme = "dark" if _is_dark else "light"
@@ -208,8 +220,14 @@ components.html(f"""
 
 
 
-# Auto-refresh every 30 seconds
-st_autorefresh(interval=30 * 1000, key="data_refresh")
+def get_refresh_interval(speed_label):
+    return {
+        '1×': 30_000,
+        '10×': 3_000,
+        '60×': 500,
+        '300×': 100,
+        '600×': 50,
+    }.get(speed_label, 30_000)
 
 # =====================================================================
 # DATA & BRIDGE
@@ -241,6 +259,18 @@ def load_data():
         return pd.DataFrame(), {}
 
 df_master, current_state = load_data()
+if not df_master.empty:
+    st.session_state.sim_index = min(st.session_state.sim_index, len(df_master) - 1)
+    current_state = df_master.iloc[st.session_state.sim_index].to_dict()
+else:
+    current_state = {}
+
+if st.session_state.sim_running and not df_master.empty:
+    next_index = st.session_state.sim_index + 1
+    if next_index < len(df_master):
+        st.session_state.sim_index = next_index
+    else:
+        st.session_state.sim_running = False
 
 # =====================================================================
 # HELPER FUNCTIONS
@@ -260,6 +290,32 @@ def get_live_weather():
         return None
     except Exception:
         return None
+
+
+def find_scenario_start(df, scenario):
+    if df.empty:
+        return 0
+    if scenario == "Panne réseau simple":
+        candidate = df[df['is_outage'] == 1]
+        return int(candidate.index[0]) if not candidate.empty else 0
+    if scenario == "Panne + Défaillance générateur G1":
+        candidate = df[df['is_outage'] == 1]
+        return int(candidate.index[0]) if not candidate.empty else 0
+    if scenario == "Panne + Carburant critique":
+        candidate = df[(df['is_outage'] == 1) & (df.get('g1_fuel_pct', 100) <= 10)]
+        if not candidate.empty:
+            return int(candidate.index[0])
+        candidate = df[(df['is_outage'] == 1) & (df.get('g1_fuel_pct', 100) < 15)]
+        return int(candidate.index[0]) if not candidate.empty else 0
+    if scenario == "Panne prolongée 48h":
+        sequence = (df['is_outage'] != df['is_outage'].shift()).cumsum()
+        groups = df.groupby(sequence)
+        for _, group in groups:
+            if int(group['is_outage'].iloc[0]) == 1 and len(group) >= 96:
+                return int(group.index[0])
+        return 0
+    return 0
+
 
 def calculate_wind_power(speed):
     if speed < 10: return 0
@@ -310,8 +366,46 @@ with st.sidebar:
     st.write(f"**Uptime:** 99.9%")
 
     st.markdown("---")
+    st.subheader("Simulation Controls")
+    speed_options = ["1×", "10×", "60×", "300×", "600×"]
+    st.session_state.sim_speed = st.selectbox("Simulation Speed", speed_options, index=speed_options.index(st.session_state.sim_speed) if st.session_state.sim_speed in speed_options else 0)
+
+    col_a, col_b, col_c = st.columns([1, 1, 1])
+    with col_a:
+        if st.button("Play/Pause"):
+            st.session_state.sim_running = not st.session_state.sim_running
+            st.experimental_rerun()
+    with col_b:
+        if st.button("Reset"):
+            st.session_state.sim_running = False
+            st.session_state.sim_index = 0
+            st.session_state.sim_scenario = "None"
+            st.experimental_rerun()
+    with col_c:
+        st.write(f"**Timestep:** {st.session_state.sim_index}")
+
+    scenario = st.selectbox(
+        "Select scenario",
+        [
+            "Panne réseau simple",
+            "Panne + Défaillance générateur G1",
+            "Panne + Carburant critique",
+            "Panne prolongée 48h",
+        ],
+        index=0
+    )
+    if st.button("Start scenario"):
+        st.session_state.sim_scenario = scenario
+        st.session_state.sim_index = find_scenario_start(df_master, scenario)
+        st.session_state.sim_running = True
+        st.experimental_rerun()
+
+    st.markdown("---")
     st.subheader("Navigation")
     page = st.radio("Navigation", ["Real-time Energy Overview", "Hospital Sections Status", "AI Predictions", "Blockchain Audit Log"])
+
+if st.session_state.sim_running:
+    st_autorefresh(interval=get_refresh_interval(st.session_state.sim_speed), key="sim_auto_refresh")
 
 # =====================================================================
 # PAGE 1: Real-time Energy Overview
@@ -327,32 +421,9 @@ if page == "Real-time Energy Overview":
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-
-        weather = get_live_weather()
-        if weather:
-            solar_kw = (weather.get("shortwave_radiation", 0) / 900.0) * 120.0
-            wind_speed = weather.get("windspeed_10m", 0)
-            wind_kw = calculate_wind_power(wind_speed)
-            data_source = "Live API"
-        else:
-            now = datetime.now()
-            if not df_master.empty:
-                df_master['ts_dt'] = pd.to_datetime(df_master['timestamp'])
-                df_master['hour_min'] = df_master['ts_dt'].dt.strftime('%H:%M')
-                current_time_str = now.strftime('%H:%M')
-                row = df_master[df_master['hour_min'] >= current_time_str].head(1)
-                if row.empty: row = df_master.tail(1)
-                solar_kw = row['solar_potential'].values[0] * 120.0
-                wind_kw = row['wind_potential'].values[0] * 80.0
-            else:
-                solar_kw = wind_kw = 0
-            data_source = "Dataset (Fallback)"
-
-        grid_kw = 600.0 if st.session_state.grid_status == "ON" else 0.0
-        gen_kw = 300.0 if st.session_state.alert_level == "CRITICAL" else 0.0
-        total_supply = solar_kw + wind_kw + grid_kw + gen_kw
-
-        st.metric("Total Generation", f"{total_supply:.1f} kW", delta=data_source, delta_color="normal")
+        total_supply = current_state.get('total_supply_kw', 0.0)
+        renewable_kw = current_state.get('net_solar_kw', 0.0) + current_state.get('net_wind_kw', 0.0)
+        st.metric("Total Supply", f"{total_supply:.1f} kW", delta=f"Renouvelable {renewable_kw:.1f} kW")
         st.markdown('</div>', unsafe_allow_html=True)
     with col2:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
@@ -371,6 +442,39 @@ if page == "Real-time Energy Overview":
         st.markdown(f"<h3>System Alert</h3><h2 class='{alert_color}'>{alert_lvl}</h2>", unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
+    st.markdown('---')
+    st.subheader('Generator Fleet Status')
+    gen_cols = st.columns(4)
+    generator_info = {
+        'g1': {'label': 'G1', 'sections': 'P1 sections'},
+        'g2': {'label': 'G2', 'sections': 'P2 sections'},
+        'g3': {'label': 'G3', 'sections': 'P3 sections'},
+        'g4': {'label': 'G4', 'sections': 'P4-P5 sections'},
+    }
+    for idx, gen_id in enumerate(['g1', 'g2', 'g3', 'g4']):
+        with gen_cols[idx]:
+            running = int(current_state.get(f'{gen_id}_running', 0))
+            fuel_pct = float(current_state.get(f'{gen_id}_fuel_pct', 0.0))
+            output_kw = float(current_state.get(f'{gen_id}_output_kw', 0.0))
+            if running:
+                status_label = 'FUEL CRITICAL' if fuel_pct < 15 else 'RUNNING'
+                badge = 'warning' if fuel_pct < 15 else 'status-on'
+            else:
+                status_label = 'OFF'
+                badge = 'status-off'
+
+            st.markdown(f"<div class='metric-card'><h3>{generator_info[gen_id]['label']}</h3><p>Status: <span class='{badge}'>{status_label}</span></p><p>Sections: {generator_info[gen_id]['sections']}</p><p>Output: {output_kw:.1f} kW</p></div>", unsafe_allow_html=True)
+            pct_value = max(0.0, min(1.0, fuel_pct / 100.0))
+            st.progress(pct_value)
+            st.write(f"Fuel: {fuel_pct:.1f}%")
+
+    grid_kw = current_state.get('grid_available_kw', 0.0)
+    solar_kw = current_state.get('net_solar_kw', 0.0)
+    wind_kw = current_state.get('net_wind_kw', 0.0)
+    gen_kw = current_state.get('total_generator_kw', 0.0)
+
+    st.markdown('---')
+
     # Charts
     st.subheader("Energy Production by Source")
     sources = ['Grid', 'Solar', 'Wind', 'Generators']
@@ -381,6 +485,26 @@ if page == "Real-time Energy Overview":
 
     fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color=_chart_font)
     st.plotly_chart(fig, use_container_width=True)
+
+    trade_file = os.path.join(base_dir, 'data', 'trades', 'energy_trades.csv')
+    trade_kwh = 0.0
+    trade_savings = 0.0
+    if os.path.exists(trade_file):
+        try:
+            trade_df = pd.read_csv(trade_file)
+            trade_kwh = (trade_df['traded_kw'] * 0.5).sum()
+            trade_savings = trade_df['cost_saving_eur'].sum()
+        except Exception:
+            trade_kwh = 0.0
+            trade_savings = 0.0
+
+    st.markdown('---')
+    st.subheader('Cost Efficiency')
+    c1, c2, c3 = st.columns(3)
+    c1.metric('Énergie tradée P2P', f"{trade_kwh:.1f} kWh")
+    c2.metric('Économie estimée', f"{trade_savings:.1f} MAD")
+    c3.metric('Fraction renouvelable', f"{current_state.get('renewable_fraction', 0.0) * 100:.1f}%")
+    st.caption('Le trading P2P entre batteries évite de solliciter les groupes électrogènes, réduisant la consommation de carburant et les coûts opérationnels.')
 
     # Action buttons
     st.markdown("---")

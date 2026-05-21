@@ -32,6 +32,24 @@ def generate_master():
     master = master.merge(wind, on='timestamp', how='left')
     master = master.merge(grid, on='timestamp', how='left')
     
+    # 2.5 Load generator data
+    print("Loading generator data...")
+    generator_dir = base_path / 'data' / 'supply' / 'generators'
+    for gen_id in ['g1', 'g2', 'g3', 'g4']:
+        gen_file = generator_dir / f'generator_{gen_id}.csv'
+        if gen_file.exists():
+            gdf = pd.read_csv(gen_file)[['timestamp', 'is_running', 'output_kw', 'fuel_level_pct']]
+            gdf = gdf.rename(columns={
+                'is_running': f'{gen_id}_running',
+                'output_kw': f'{gen_id}_output_kw',
+                'fuel_level_pct': f'{gen_id}_fuel_pct'
+            })
+            master = master.merge(gdf, on='timestamp', how='left')
+        else:
+            master[f'{gen_id}_running'] = 0
+            master[f'{gen_id}_output_kw'] = 0.0
+            master[f'{gen_id}_fuel_pct'] = 0.0
+
     # 3. Load Demand (Aggregate)
     print("Aggregating demand data...")
     demand = pd.read_csv(demand_file)
@@ -57,10 +75,14 @@ def generate_master():
         
     # 5. Load Trades
     print("Loading trades data...")
-    if trades_file.exists():
-        trades = pd.read_csv(trades_file)
-        trade_timestamps = trades['timestamp'].unique()
-        master['is_trading'] = master['timestamp'].isin(trade_timestamps).astype(int)
+    if trades_file.exists() and trades_file.stat().st_size > 0:
+        contents = trades_file.read_text().strip()
+        if contents:
+            trades = pd.read_csv(trades_file)
+            trade_timestamps = trades['timestamp'].unique()
+            master['is_trading'] = master['timestamp'].isin(trade_timestamps).astype(int)
+        else:
+            master['is_trading'] = 0
     else:
         master['is_trading'] = 0
         
@@ -84,6 +106,23 @@ def generate_master():
     # We find the index of the min value across battery columns
     master['min_battery_section'] = master[bat_cols].idxmin(axis=1).str.replace("bat_", "").str.replace("_pct", "")
     
+    master['total_generator_kw'] = (
+        master['g1_output_kw'].fillna(0) +
+        master['g2_output_kw'].fillna(0) +
+        master['g3_output_kw'].fillna(0) +
+        master['g4_output_kw'].fillna(0)
+    )
+    master['total_supply_kw'] = master['grid_available_kw'].fillna(0) + master['net_solar_kw'].fillna(0) + master['net_wind_kw'].fillna(0) + master['total_generator_kw']
+    master['energy_balance_kw'] = master['total_supply_kw'] - master['total_hospital_kw']
+
+    for gen_id in ['g1', 'g2', 'g3', 'g4']:
+        master[f'{gen_id}_running'] = master[f'{gen_id}_running'].fillna(0).astype(int)
+        master[f'{gen_id}_output_kw'] = master[f'{gen_id}_output_kw'].fillna(0.0)
+        master[f'{gen_id}_fuel_pct'] = master[f'{gen_id}_fuel_pct'].fillna(0.0)
+
+    master['any_generator_running'] = ((master['g1_running'] == 1) | (master['g2_running'] == 1) | (master['g3_running'] == 1) | (master['g4_running'] == 1)).astype(int)
+    master['any_fuel_critical'] = ((master['g1_fuel_pct'] < 15) | (master['g2_fuel_pct'] < 15) | (master['g3_fuel_pct'] < 15) | (master['g4_fuel_pct'] < 15)).astype(int)
+
     master['renewable_fraction'] = (master['net_solar_kw'] + master['net_wind_kw']) / master['total_supply_kw']
     master['renewable_fraction'] = master['renewable_fraction'].fillna(0).replace([np.inf, -np.inf], 0)
     

@@ -2,7 +2,22 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
-def generate_batteries():
+def load_generator_states(base_path):
+    generator_dir = base_path / "data" / "supply" / "generators"
+    generator_files = {
+        'g1': generator_dir / 'generator_g1.csv',
+        'g2': generator_dir / 'generator_g2.csv',
+        'g3': generator_dir / 'generator_g3.csv',
+        'g4': generator_dir / 'generator_g4.csv',
+    }
+    generator_state = {}
+    for gen, path in generator_files.items():
+        if path.exists():
+            generator_state[gen] = pd.read_csv(path)
+    return generator_state
+
+
+def generate_batteries(generator_states=None):
     # Set seed for reproducibility
     np.random.seed(42)
     
@@ -21,6 +36,8 @@ def generate_batteries():
     wind_df = pd.read_csv(wind_file)
     
     n_steps = len(grid_df)
+    if generator_states is None:
+        generator_states = load_generator_states(base_path)
     
     # Battery Specifications
     # Note: 30-minute resolution means energy in kWh = power in kW * 0.5h
@@ -52,13 +69,28 @@ def generate_batteries():
     DEGRADATION_PER_CYCLE = 0.003 / 100.0 # 0.003%
     TIMESTEP_H = 0.5
     
+    generator_to_batteries = {
+        'g1': ['bat_reanimation', 'bat_bloc', 'bat_urgences', 'bat_neonatologie'],
+        'g2': ['bat_dialyse', 'bat_maternite', 'bat_laboratoire', 'bat_pharmacie'],
+        'g3': ['bat_radiologie'],
+        'g4': ['bat_general'],
+    }
+    battery_to_generator = {}
+    for gen, batteries in generator_to_batteries.items():
+        for battery_name in batteries:
+            battery_to_generator[battery_name] = gen
+
     # Simulation Loop
     for i in range(n_steps):
         is_outage = grid_df.iloc[i]['is_outage']
         solar_kw = solar_df.iloc[i]['net_solar_kw']
         wind_kw = wind_df.iloc[i]['net_wind_kw']
         
-        # Reset timestep-specific flags for all batteries
+        # Reload generator timers for this timestep
+        active_generators = {}
+        for gen_id, gen_df in generator_states.items():
+            if i < len(gen_df):
+                active_generators[gen_id] = gen_df.iloc[i].to_dict()
         for s in specs:
             s['trade_flag'] = 0
             s['traded_kw'] = 0.0
@@ -109,13 +141,40 @@ def generate_batteries():
                     s['cycle_count'] += delta_cycles
 
         else:
-            # Grid OFF: Discharging
-            # Each battery discharges for its own section
+            # Grid OFF: Discharging or generator-supported recharge
+            # Each battery discharges for its own section unless its generator is running.
             for s in specs:
                 demand_kw = s['demand_kw']
+                battery_name = s['name']
+                gen_id = battery_to_generator.get(battery_name)
+                generator_running = False
+                generator_output_kw = 0.0
+                generator_recharge_kw = 0.0
+                if gen_id and gen_id in active_generators:
+                    gen_state = active_generators[gen_id]
+                    if int(gen_state.get('is_running', 0)) == 1:
+                        generator_running = True
+                        generator_output_kw = float(gen_state.get('output_kw', 0.0))
+                        generator_recharge_kw = 0.20 * generator_output_kw
+
+                if generator_running and generator_recharge_kw > 0:
+                    # Recharge covered battery from generator instead of discharging
+                    max_charge_needed_kwh = max(0, s['usable_capacity_kwh'] - s['current_charge_kwh'])
+                    max_charge_kw = min(s['max_rate_kw'], generator_recharge_kw)
+                    actual_charge_kw = min(max_charge_kw, max_charge_needed_kwh / TIMESTEP_H / CHG_EFF)
+                    if actual_charge_kw > 0:
+                        energy_in = actual_charge_kw * TIMESTEP_H * CHG_EFF
+                        s['current_charge_kwh'] += energy_in
+                        s['is_charging'] = 1
+                        s['charge_rate_kw'] = actual_charge_kw
+                        s['discharge_rate_kw'] = 0.0
+                        s['trade_flag'] = 0
+                        s['traded_kw'] = 0.0
+                        continue
+
                 max_avail_kwh = max(0, s['current_charge_kwh'] - (s['min_level'] * s['usable_capacity_kwh']))
                 max_avail_kw = (max_avail_kwh / TIMESTEP_H) * DIS_EFF
-                
+
                 actual_dis_kw = min(demand_kw, s['max_rate_kw'], max_avail_kw)
                 s['discharge_rate_kw'] = actual_dis_kw
                 if actual_dis_kw > 0:
