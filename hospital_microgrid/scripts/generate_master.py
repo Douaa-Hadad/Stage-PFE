@@ -38,15 +38,17 @@ def generate_master():
     for gen_id in ['g1', 'g2', 'g3', 'g4']:
         gen_file = generator_dir / f'generator_{gen_id}.csv'
         if gen_file.exists():
-            gdf = pd.read_csv(gen_file)[['timestamp', 'is_running', 'output_kw', 'fuel_level_pct']]
+            gdf = pd.read_csv(gen_file)[['timestamp', 'is_running', 'output_kw', 'fuel_level_pct', 'startup_delay_active']]
             gdf = gdf.rename(columns={
                 'is_running': f'{gen_id}_running',
                 'output_kw': f'{gen_id}_output_kw',
-                'fuel_level_pct': f'{gen_id}_fuel_pct'
+                'fuel_level_pct': f'{gen_id}_fuel_pct',
+                'startup_delay_active': f'{gen_id}_starting'
             })
             master = master.merge(gdf, on='timestamp', how='left')
         else:
             master[f'{gen_id}_running'] = 0
+            master[f'{gen_id}_starting'] = 0
             master[f'{gen_id}_output_kw'] = 0.0
             master[f'{gen_id}_fuel_pct'] = 0.0
 
@@ -117,6 +119,7 @@ def generate_master():
 
     for gen_id in ['g1', 'g2', 'g3', 'g4']:
         master[f'{gen_id}_running'] = master[f'{gen_id}_running'].fillna(0).astype(int)
+        master[f'{gen_id}_starting'] = master[f'{gen_id}_starting'].fillna(0).astype(int)
         master[f'{gen_id}_output_kw'] = master[f'{gen_id}_output_kw'].fillna(0.0)
         master[f'{gen_id}_fuel_pct'] = master[f'{gen_id}_fuel_pct'].fillna(0.0)
 

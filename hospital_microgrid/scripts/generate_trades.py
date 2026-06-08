@@ -7,16 +7,16 @@ import pandas as pd
 
 def get_battery_specs():
     return {
-        'bat_reanimation': {'section': 'Réanimation/ICU', 'priority': 1, 'capacity_kwh': 200.0},
-        'bat_bloc': {'section': 'Bloc Opératoire', 'priority': 1, 'capacity_kwh': 150.0},
+        'bat_reanimation': {'section': 'Reanimation/ICU', 'priority': 1, 'capacity_kwh': 200.0},
+        'bat_bloc': {'section': 'Bloc Operatoire', 'priority': 1, 'capacity_kwh': 150.0},
         'bat_urgences': {'section': 'Urgences', 'priority': 1, 'capacity_kwh': 150.0},
-        'bat_neonatologie': {'section': 'Néonatologie', 'priority': 1, 'capacity_kwh': 100.0},
+        'bat_neonatologie': {'section': 'Neonatologie', 'priority': 1, 'capacity_kwh': 100.0},
         'bat_dialyse': {'section': 'Dialyse', 'priority': 2, 'capacity_kwh': 100.0},
-        'bat_maternite': {'section': 'Maternité', 'priority': 2, 'capacity_kwh': 80.0},
+        'bat_maternite': {'section': 'Maternite', 'priority': 2, 'capacity_kwh': 80.0},
         'bat_laboratoire': {'section': 'Laboratoire', 'priority': 2, 'capacity_kwh': 60.0},
         'bat_pharmacie': {'section': 'Pharmacie', 'priority': 2, 'capacity_kwh': 60.0},
         'bat_radiologie': {'section': 'Radiologie', 'priority': 3, 'capacity_kwh': 80.0},
-        'bat_general': {'section': 'Général', 'priority': 5, 'capacity_kwh': 200.0},
+        'bat_general': {'section': 'General', 'priority': 5, 'capacity_kwh': 200.0},
     }
 
 

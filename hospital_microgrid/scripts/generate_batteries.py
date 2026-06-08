@@ -42,16 +42,16 @@ def generate_batteries(generator_states=None):
     # Battery Specifications
     # Note: 30-minute resolution means energy in kWh = power in kW * 0.5h
     specs = [
-        {"name": "bat_reanimation", "section": "Réanimation / ICU", "priority": 1, "capacity_kwh": 200, "max_rate_kw": 60, "min_level": 0.10, "demand_kw": 35},
-        {"name": "bat_bloc", "section": "Bloc Opératoire", "priority": 1, "capacity_kwh": 150, "max_rate_kw": 50, "min_level": 0.10, "demand_kw": 45},
+        {"name": "bat_reanimation", "section": "Reanimation/ICU", "priority": 1, "capacity_kwh": 200, "max_rate_kw": 60, "min_level": 0.10, "demand_kw": 35},
+        {"name": "bat_bloc", "section": "Bloc Operatoire", "priority": 1, "capacity_kwh": 150, "max_rate_kw": 50, "min_level": 0.10, "demand_kw": 45},
         {"name": "bat_urgences", "section": "Urgences", "priority": 1, "capacity_kwh": 150, "max_rate_kw": 50, "min_level": 0.10, "demand_kw": 50},
-        {"name": "bat_neonatologie", "section": "Néonatologie", "priority": 1, "capacity_kwh": 100, "max_rate_kw": 40, "min_level": 0.10, "demand_kw": 20},
+        {"name": "bat_neonatologie", "section": "Neonatologie", "priority": 1, "capacity_kwh": 100, "max_rate_kw": 40, "min_level": 0.10, "demand_kw": 20},
         {"name": "bat_dialyse", "section": "Dialyse", "priority": 2, "capacity_kwh": 100, "max_rate_kw": 40, "min_level": 0.15, "demand_kw": 30},
-        {"name": "bat_maternite", "section": "Maternité", "priority": 2, "capacity_kwh": 80, "max_rate_kw": 30, "min_level": 0.15, "demand_kw": 25},
+        {"name": "bat_maternite", "section": "Maternite", "priority": 2, "capacity_kwh": 80, "max_rate_kw": 30, "min_level": 0.15, "demand_kw": 25},
         {"name": "bat_laboratoire", "section": "Laboratoire", "priority": 2, "capacity_kwh": 60, "max_rate_kw": 25, "min_level": 0.15, "demand_kw": 15},
         {"name": "bat_pharmacie", "section": "Pharmacie", "priority": 2, "capacity_kwh": 60, "max_rate_kw": 25, "min_level": 0.20, "demand_kw": 10},
         {"name": "bat_radiologie", "section": "Radiologie", "priority": 3, "capacity_kwh": 80, "max_rate_kw": 30, "min_level": 0.20, "demand_kw": 35},
-        {"name": "bat_general", "section": "Rest of hospital", "priority": 5, "capacity_kwh": 200, "max_rate_kw": 60, "min_level": 0.25, "demand_kw": 80}
+        {"name": "bat_general", "section": "General", "priority": 5, "capacity_kwh": 200, "max_rate_kw": 60, "min_level": 0.25, "demand_kw": 80}
     ]
     
     # Initialize State

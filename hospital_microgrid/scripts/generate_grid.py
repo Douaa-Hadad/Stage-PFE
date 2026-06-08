@@ -75,6 +75,18 @@ def generate_grid():
     # 5. Scheduled Maintenance (~2/year, 8-16 timesteps, night only, 0 kW)
     apply_events(2, (8, 16), (0, 0), 'maintenance', is_outage=True, night_only=True)
     
+    # 6. Presentation Outage (Deterministic 48-hour blackout at step 1681 to 1776)
+    major_outage_start = 1681
+    major_outage_duration = 96
+    major_outage_end = major_outage_start + major_outage_duration
+    
+    df.loc[major_outage_start:major_outage_end-1, 'grid_capacity_pct'] = 0.0
+    df.loc[major_outage_start:major_outage_end-1, 'event_type'] = 'full_outage'
+    df.loc[major_outage_start:major_outage_end-1, 'event_id'] = 'MAJOR_BLACKOUT'
+    df.loc[major_outage_start:major_outage_end-1, 'is_outage'] = 1
+    df.loc[major_outage_start:major_outage_end-1, 'voltage_stable'] = 1
+
+    
     # Final Calculation
     df['grid_available_kw'] = CONTRACTED_CAPACITY_KW * (df['grid_capacity_pct'] / 100.0)
     
